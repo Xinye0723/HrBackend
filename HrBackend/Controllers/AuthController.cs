@@ -57,10 +57,19 @@ namespace HrBackend.Controllers
             //產生 JWT
             string token = CreateToken(user);
 
+            //將 Token 設定為 HttpOnly Cookie
+            var cookieOptions = new CookieOptions
+            {
+                HttpOnly = true,
+                Secure = true, // 若使用 HTTPS，請設為 true
+                Expires = DateTimeOffset.Now.AddHours(8),
+                SameSite = SameSiteMode.None,
+            };
+            // 將 Token 寫入回應的 Cookie 中，Key 命名為 "Authorization" 或 "token"
+            Response.Cookies.Append("token", token, cookieOptions);
             //回傳結果
             return Ok(new LoginResponseDto
             {
-                Token = token,
                 FullName = user.FullName,
                 Role = user.Role
             });
