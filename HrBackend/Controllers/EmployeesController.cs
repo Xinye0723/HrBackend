@@ -1,9 +1,10 @@
-﻿using HrBackend.Models;
+﻿using Azure.Core;
+using HrBackend.DTOs;   
+using HrBackend.Models;
 using Microsoft.AspNetCore.Authorization; // 引用授權功能
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
-
 namespace HrBackend.Controllers
 {
     [Route("api/[controller]")]
@@ -66,6 +67,44 @@ namespace HrBackend.Controllers
                 })
                 .ToListAsync();
             return Ok(employees);
+        }
+
+        //新增員工
+        // POST: api/employees
+        [HttpPost]
+        public async Task<ActionResult<Employee>> CreateEmployee(CreateEmployeeDto dto)
+        {
+            // 檢查是否已有相同 EmployeeId 的員工
+            if (await _context.Employees.AnyAsync(e => e.EmployeeId == dto.EmployeeId))
+            {
+                return Conflict("已存在相同的員工編號");
+            }
+            // 2. 檢查 Email 是否重複
+            if (await _context.Employees.AnyAsync(e => e.Email == dto.Email))
+            {
+                return BadRequest("Email 已被使用");
+            }
+            //建立預設密碼 (員工編號的 BCrypt Hash)
+            string defaultPasswordHash = BCrypt.Net.BCrypt.HashPassword($"{dto.EmployeeId}");
+
+            var employee = new Employee
+            {
+                EmployeeId = dto.EmployeeId,
+                FullName = dto.FullName,
+                Email = dto.Email,
+                Department = dto.Department,
+                Position = dto.Position,
+                OnboardDate = dto.OnboardDate,
+                // 系統預設值
+                IsActive = true,
+                PasswordHash = defaultPasswordHash,
+                Role = "User",
+                CreatedAt = DateTime.Now
+            };
+
+            _context.Employees.Add(employee);
+            await _context.SaveChangesAsync();
+            return Ok(new { message = "員工新增成功" });
         }
     }
 }
