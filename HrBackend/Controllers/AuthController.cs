@@ -101,5 +101,17 @@ namespace HrBackend.Controllers
 
             return tokenHandler.WriteToken(token);
         }
+        //登出
+        [HttpPost("logout")]
+        public IActionResult Logout()
+        {
+            Response.Cookies.Delete("token", new CookieOptions
+            {
+                HttpOnly = true,
+                Secure = true,
+                SameSite = SameSiteMode.None,
+            });
+            return Ok(new { message = "登出成功" });
+        }
     }
 }
