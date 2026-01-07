@@ -45,5 +45,27 @@ namespace HrBackend.Controllers
 
             return Ok(employee);
         }
+        //取得所有員工列表
+        //GET: api/employees
+        [HttpGet]
+        // [Authorize(Roles = "Admin,Manager")] // 未來可以限制只有管理員能看
+        public async Task<ActionResult<IEnumerable<object>>> GetAllEmployees()
+        {
+            var employees = await _context.Employees
+                .Select(e => new
+                {
+                    e.EmployeeId,
+                    e.FullName,
+                    e.EnglishName,
+                    e.Department,
+                    e.Position,
+                    e.Email,
+                    e.Phone,
+                    e.IsActive,
+                    e.OnboardDate,
+                })
+                .ToListAsync();
+            return Ok(employees);
+        }
     }
 }
