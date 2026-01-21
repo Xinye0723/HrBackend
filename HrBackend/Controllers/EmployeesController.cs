@@ -77,11 +77,33 @@ namespace HrBackend.Controllers
         [HttpPost]
         public async Task<ActionResult<Employee>> CreateEmployee(CreateEmployeeDto dto)
         {
-            // 檢查是否已有相同 EmployeeId 的員工
-            if (await _context.Employees.AnyAsync(e => e.EmployeeId == dto.EmployeeId))
+            // 1. 自動產生 EmployeeId (避免前端傳入導致 Race Condition)
+            // 鎖定資料表或使用交易可能更好，但基礎解法是先在此處產生
+            var lastEmployee = await _context.Employees
+                .OrderByDescending(e => e.EmployeeId)
+                .FirstOrDefaultAsync();
+
+            string nextId = "A0001";
+            if (lastEmployee != null)
             {
-                return Conflict("已存在相同的員工編號");
+                string currentId = lastEmployee.EmployeeId;
+                if (int.TryParse(currentId.Substring(1), out int maxNum))
+                {
+                    maxNum++;
+                    nextId = $"A{maxNum:D4}";
+                }
             }
+
+            // 再次確認該 ID 是否真的未被使用 (防呆)
+            while (await _context.Employees.AnyAsync(e => e.EmployeeId == nextId))
+            {
+                 // 簡單的碰撞處理：如果剛好有人搶走了，就再加 1
+                 // 注意：實務上高併發建議用 Sequence 或轉由資料庫觸發器處理
+                 int currentNum = int.Parse(nextId.Substring(1));
+                 currentNum++;
+                 nextId = $"A{currentNum:D4}";
+            }
+
             // 2. 檢查 Email 是否重複
             if (await _context.Employees.AnyAsync(e => e.Email == dto.Email))
             {
@@ -92,7 +114,7 @@ namespace HrBackend.Controllers
 
             var employee = new Employee
             {
-                EmployeeId = dto.EmployeeId,
+                EmployeeId = nextId, // 使用內部產生的 ID
                 FullName = dto.FullName,
                 Email = dto.Email,
                 Department = dto.Department,
