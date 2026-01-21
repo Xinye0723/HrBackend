@@ -14,6 +14,8 @@ public partial class HRContext : DbContext
     }
 
     public virtual DbSet<Employee> Employees { get; set; }
+    public virtual DbSet<Department> Departments { get; set; }
+
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -52,6 +54,18 @@ public partial class HRContext : DbContext
                 .HasAnnotation("Relational:DefaultConstraintName", "DF_Employees_Role");
             entity.Property(e => e.UpdatedAt).HasColumnType("datetime");
         });
+
+        modelBuilder.Entity<Department>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Name).IsRequired().HasMaxLength(100);
+            
+            entity.HasOne(d => d.Parent)
+                .WithMany(p => p.InverseParent)
+                .HasForeignKey(d => d.ParentId)
+                .OnDelete(DeleteBehavior.Restrict); // Prevent cascading delete for safety
+        });
+
 
         OnModelCreatingPartial(modelBuilder);
     }
