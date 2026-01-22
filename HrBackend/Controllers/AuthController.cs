@@ -1,5 +1,6 @@
 ﻿using HrBackend.DTOs;
 using HrBackend.Models;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -22,17 +23,7 @@ namespace HrBackend.Controllers
             _configuration = configuration;
         }
         // --- 小工具：產生 Hash (取得 Hash 後請刪除此 API) ---
-        // 用法：啟動後在瀏覽器輸入 /api/auth/hash?pwd=123456
-        [HttpGet("hash")]
-        public ActionResult<string> GetHash(string pwd)
-        {
-            if (string.IsNullOrEmpty(pwd))
-            {
-                return BadRequest("Password is required");
-            }
-            var hash = BCrypt.Net.BCrypt.HashPassword(pwd);
-            return Ok(hash);
-        }
+        // 已刪除 insecure endpoint
         // POST: api/auth/login
         [HttpPost("login")]
         public async Task<ActionResult<LoginResponseDto>> Login([FromBody] LoginDto request)
@@ -112,6 +103,36 @@ namespace HrBackend.Controllers
                 SameSite = SameSiteMode.None,
             });
             return Ok(new { message = "登出成功" });
+        }
+        //修改密碼
+        [Authorize]
+        [HttpPost("change-password")]
+        public async Task<IActionResult> ChangePassword([FromBody]ChangePasswordDto request)
+        {
+            //取id
+            var userIdString = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (string.IsNullOrEmpty(userIdString))
+            {
+                return Unauthorized(new { message = "無法識別使用者身分" });
+            }
+            //找使用者
+            var employee = await _context.Employees.FirstOrDefaultAsync(u => u.EmployeeId == userIdString);
+            if (employee == null)
+            {
+                return NotFound(new { message = "使用者不存在" });
+            }
+            //驗證舊密碼
+            if(!BCrypt.Net.BCrypt.Verify(request.CurrentPassword, employee.PasswordHash))
+            {
+                return BadRequest(new { message = "舊密碼錯誤" });
+            }
+
+            //更新新密碼
+            string newHashedPassword = BCrypt.Net.BCrypt.HashPassword(request.NewPassword);
+            employee.PasswordHash = newHashedPassword;
+
+            await _context.SaveChangesAsync();
+            return Ok(new { message = "密碼更新成功" } );
         }
     }
 }
